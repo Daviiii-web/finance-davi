@@ -1,0 +1,60 @@
+{
+  "transactions": [
+    {
+      "id": "1",
+      "title": "Salário mensal",
+      "amount": 5000,
+      "type": "income",
+      "category": "Outros",
+      "date": "2024-01-31"
+    },
+    {
+      "id": "2",
+      "title": "Aluguel",
+      "amount": 1200,
+      "type": "expense",
+      "category": "Moradia",
+      "date": "2024-02-01"
+    },
+    {
+      "id": "3",
+      "title": "Mercado",
+      "amount": 150,
+      "type": "expense",
+      "category": "Alimentação",
+      "date": "2024-02-02"
+    },
+    {
+      "id": "4",
+      "title": "Gasolina",
+      "amount": 80,
+      "type": "expense",
+      "category": "Transporte",
+      "date": "2024-02-04"
+    },
+    {
+      "id": "5",
+      "title": "Projeto freelance",
+      "amount": 800,
+      "type": "income",
+      "category": "Outros",
+      "date": "2024-02-06"
+    },
+    {
+      "id": "6",
+      "title": "Cinema e jantar",
+      "amount": 200,
+      "type": "expense",
+      "category": "Lazer",
+      "date": "2024-02-09"
+    },
+    {
+      "id": "7",
+      "title": "Farmácia",
+      "amount": 120,
+      "type": "expense",
+      "category": "Saúde",
+      "date": "2024-02-10"
+    }
+  ]
+}
