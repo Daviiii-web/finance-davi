@@ -1,206 +1,66 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { FormEvent } from 'react';
 import type { Transaction, Category, TransactionType } from '../../types';
+import Icon from '../Icon';
 
 interface AddTransactionPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (data: Omit<Transaction, 'id'>) => void;
 }
+const categories: Category[] = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Lazer', 'Outros'];
 
-const CATEGORIES: Category[] = [
-  'Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Lazer', 'Outros'
-];
-
-const initialForm = {
-  title: '',
-  amount: '',
-  type: 'expense' as TransactionType,
-  category: 'Outros' as Category,
-  date: new Date().toISOString().split('T')[0],
-};
+function createInitialForm() {
+  const now = new Date();
+  const date = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+  return { title: '', amount: '', type: 'expense' as TransactionType, category: 'Outros' as Category, date };
+}
 
 export default function AddTransactionPanel({ isOpen, onClose, onAdd }: AddTransactionPanelProps) {
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(createInitialForm);
+  const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
-  function handleSubmit() {
-    if (!form.title.trim() || !form.amount || !form.date) {
-      alert('Preencha todos os campos!');
-      return;
-    }
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (isOpen) dialog?.showModal();
+    else dialog?.close();
+    if (!isOpen) return;
+    const oldOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = oldOverflow; };
+  }, [isOpen]);
 
-    onAdd({
-      title: form.title.trim(),
-      amount: parseFloat(form.amount),
-      type: form.type,
-      category: form.category,
-      date: form.date,
-    });
-
-    setForm(initialForm);
+  function closePanel() {
+    setError(null);
+    setForm(createInitialForm());
     onClose();
   }
 
-  const inputStyle = {
-    width: '100%',
-    padding: '10px 12px',
-    borderRadius: '8px',
-    border: '1px solid rgba(255,255,255,0.2)',
-    background: 'rgba(255,255,255,0.1)',
-    color: 'white',
-    fontSize: '14px',
-    outline: 'none',
-    boxSizing: 'border-box' as const,
-  };
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!form.title.trim()) { setError('Digite um título para criar a transação!'); return; }
+    if (!form.amount || !form.date) { setError('Preencha o valor e a data.'); return; }
+    const amount = Number(form.amount);
+    if (!Number.isFinite(amount) || amount <= 0) { setError('O valor deve ser um número maior que zero!'); return; }
+    onAdd({ title: form.title.trim(), amount, type: form.type, category: form.category, date: form.date });
+    closePanel();
+  }
 
-  const labelStyle = {
-    display: 'block',
-    color: '#c4b5fd',
-    fontSize: '13px',
-    marginBottom: '6px',
-  };
-
-  return (
-    <>
-      {isOpen && (
-        <div
-          onClick={onClose}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 40,
-          }}
-        />
-      )}
-
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        height: '100vh',
-        width: '360px',
-        background: 'linear-gradient(180deg, #2e1065, #4c1d95)',
-        borderLeft: '1px solid rgba(255,255,255,0.15)',
-        zIndex: 50,
-        padding: '24px',
-        transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-        transition: 'transform 0.3s ease',
-        overflowY: 'auto',
-      }}>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>Nova Transação</h2>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'rgba(255,255,255,0.1)',
-              border: 'none',
-              color: 'white',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              fontSize: '18px',
-            }}
-          >
-            ✕
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-          <div>
-            <label style={labelStyle}>Tipo</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {(['income', 'expense'] as TransactionType[]).map(type => (
-                <button
-                  key={type}
-                  onClick={() => setForm(prev => ({ ...prev, type }))}
-                  style={{
-                    flex: 1,
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    background: form.type === type
-                      ? (type === 'income' ? '#16a34a' : '#dc2626')
-                      : 'rgba(255,255,255,0.1)',
-                    color: 'white',
-                  }}
-                >
-                  {type === 'income' ? '↗ Receita' : '↘ Despesa'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label style={labelStyle}>Título</label>
-            <input
-              style={inputStyle}
-              placeholder="Ex: Salário, Mercado..."
-              value={form.title}
-              onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Valor (R$)</label>
-            <input
-              style={inputStyle}
-              type="number"
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              value={form.amount}
-              onChange={e => setForm(prev => ({ ...prev, amount: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Categoria</label>
-            <select
-              style={inputStyle}
-              value={form.category}
-              onChange={e => setForm(prev => ({ ...prev, category: e.target.value as Category }))}
-            >
-              {CATEGORIES.map(cat => (
-                <option key={cat} value={cat} style={{ background: '#4c1d95' }}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={labelStyle}>Data</label>
-            <input
-              style={inputStyle}
-              type="date"
-              value={form.date}
-              onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))}
-            />
-          </div>
-
-          <button
-            onClick={handleSubmit}
-            style={{
-              background: '#7c3aed',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              padding: '14px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              marginTop: '8px',
-            }}
-          >
-            Salvar Transação
-          </button>
-        </div>
-      </div>
-    </>
-  );
+  return <dialog ref={dialogRef} className="transaction-dialog" aria-labelledby="transaction-dialog-title" onCancel={event => { event.preventDefault(); closePanel(); }} onClick={event => { if (event.target === event.currentTarget) closePanel(); }}>
+    <div className="dialog-content">
+      <div className="dialog-heading"><div><p className="eyebrow">ORGANIZE SEU DIA A DIA</p><h2 id="transaction-dialog-title">Nova transação</h2></div><button className="icon-button" aria-label="Fechar formulário" onClick={closePanel}><Icon name="close" /></button></div>
+      <form onSubmit={handleSubmit} noValidate>
+        <fieldset className="type-fieldset"><legend>Tipo de movimentação</legend><div className="type-options">{(['expense', 'income'] as const).map(type => <button type="button" key={type} aria-pressed={form.type === type} className={form.type === type ? 'type-option selected ' + type : 'type-option'} onClick={() => setForm(prev => ({ ...prev, type }))}><Icon name={type === 'income' ? 'down' : 'up'} size={18} />{type === 'income' ? 'Receita' : 'Despesa'}</button>)}</div></fieldset>
+        <label className="form-label" htmlFor="transaction-amount">Valor da transação</label>
+        <div className="amount-field"><span>R$</span><input id="transaction-amount" type="number" inputMode="decimal" placeholder="0,00" min="0.01" step="0.01" required value={form.amount} onChange={e => setForm(prev => ({ ...prev, amount: e.target.value }))} /></div>
+        <label className="form-label" htmlFor="transaction-title">Descrição</label>
+        <input className="form-input" id="transaction-title" placeholder="Ex.: Compras do mercado" required value={form.title} onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))} />
+        <div className="form-grid"><div><label className="form-label" htmlFor="transaction-category">Categoria</label><select className="form-input" id="transaction-category" value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value as Category }))}>{categories.map(category => <option key={category}>{category}</option>)}</select></div>
+          <div><label className="form-label" htmlFor="transaction-date">Data</label><input className="form-input" id="transaction-date" type="date" required value={form.date} onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))} /></div></div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="dialog-actions"><button type="button" className="button secondary" onClick={closePanel}>Cancelar</button><button type="submit" className="button primary"><Icon name="plus" size={18} />Salvar transação</button></div>
+      </form>
+    </div>
+  </dialog>;
 }

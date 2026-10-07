@@ -1,79 +1,27 @@
 import type { Transaction, FinancialSummary } from '../types';
 import SummaryCards from '../components/dashboard/SummaryCards';
-import CategoryChart from '../components/Statistics/CategoryBarChart';
-import TopExpenses from '../components/dashboard/TopExpenses';
+import CategoryBarChart from '../components/Statistics/CategoryBarChart';
+import MonthlyChart from '../components/Statistics/MonthlyChart';
+import TransactionList from '../components/Transactions/TransactionList';
+import Icon from '../components/Icon';
 
 interface DashboardPageProps {
   transactions: Transaction[];
   summary: FinancialSummary;
+  onViewAll: () => void;
+  onNew: () => void;
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: 'numeric',
-    month: 'long',
-  });
-}
-
-const cardStyle = {
-  background: 'rgba(255,255,255,0.08)',
-  borderRadius: '12px',
-  padding: '20px',
-  border: '1px solid rgba(255,255,255,0.1)',
-  marginBottom: '24px',
-};
-
-export default function DashboardPage({ transactions, summary }: DashboardPageProps) {
-  const recentTransactions = transactions.slice(0, 5);
-
-  return (
-    <div>
-      <SummaryCards summary={summary} />
-      <CategoryChart transactions={transactions} />
-      <TopExpenses transactions={transactions} />
-
-      <div style={cardStyle}>
-        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>
-          Transações Recentes
-        </h2>
-
-        {recentTransactions.map((t) => (
-          <div key={t.id} style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '12px',
-            borderRadius: '8px',
-            marginBottom: '8px',
-            background: 'rgba(255,255,255,0.05)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: t.type === 'income' ? 'rgba(74,222,128,0.2)' : 'rgba(248,113,113,0.2)',
-                fontSize: '16px',
-              }}>
-                {t.type === 'income' ? '↗' : '↘'}
-              </div>
-              <div>
-                <p style={{ fontWeight: '500', fontSize: '14px' }}>{t.title}</p>
-                <p style={{ color: '#c4b5fd', fontSize: '12px' }}>{formatDate(t.date)}</p>
-              </div>
-            </div>
-            <span style={{
-              fontWeight: '600',
-              color: t.type === 'income' ? '#4ade80' : '#f87171',
-            }}>
-              {t.type === 'income' ? '+' : '-'} R$ {t.amount.toFixed(2)}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+export default function DashboardPage({ transactions, summary, onViewAll, onNew }: DashboardPageProps) {
+  const recent = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+  return <div className="page-stack">
+    <SummaryCards summary={summary} />
+    <div className="section-caption"><h2>Seu panorama financeiro</h2><span>Todo o histórico</span></div>
+    <div className="dashboard-charts"><MonthlyChart transactions={transactions} /><CategoryBarChart transactions={transactions} /></div>
+    <section className="panel">
+      <div className="panel-heading"><div><h2>Últimas transações</h2><p>Os movimentos mais recentes por data</p></div><button className="text-button" onClick={onViewAll}>Ver todas <Icon name="chevron" size={16} /></button></div>
+      <TransactionList transactions={recent} />
+      {transactions.length === 0 && <div className="empty-action"><button className="button secondary" onClick={onNew}><Icon name="plus" size={17} />Registrar meu primeiro lançamento</button></div>}
+    </section>
+  </div>;
 }

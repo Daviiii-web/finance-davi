@@ -1,91 +1,37 @@
 import { useState } from 'react';
 import type { Transaction } from '../types';
 import TransactionList from '../components/Transactions/TransactionList';
-import AddTransactionPanel from '../components/Transactions/AddTransactionPanel';
+import Icon from '../components/Icon';
+import { formatCurrency } from '../format';
 
 interface TransactionsPageProps {
   transactions: Transaction[];
-  onAdd: (data: Omit<Transaction, 'id'>) => void;
   onDelete: (id: string) => void;
+  onNew: () => void;
 }
-
 type FilterType = 'all' | 'income' | 'expense';
 
-export default function TransactionsPage({ transactions, onAdd, onDelete }: TransactionsPageProps) {
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
+export default function TransactionsPage({ transactions, onDelete, onNew }: TransactionsPageProps) {
   const [filter, setFilter] = useState<FilterType>('all');
+  const [search, setSearch] = useState('');
+  const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  const filtered = transactions.filter(t =>
+    (filter === 'all' || t.type === filter) &&
+    normalize(t.title + ' ' + t.category).includes(normalize(search.trim()))
+  ).sort((a, b) => b.date.localeCompare(a.date));
+  const net = filtered.reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0);
 
-  const filteredTransactions = transactions.filter(t => {
-    if (filter === 'all') return true;
-    return (t.type as string) === filter;
-  });
-
-  const filterButtons: { id: FilterType; label: string }[] = [
-    { id: 'all',     label: 'Todas'    },
-    { id: 'income',  label: 'Receitas' },
-    { id: 'expense', label: 'Despesas' },
-  ];
-
-  return (
-    <div style={{ position: 'relative' }}>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Transações</h1>
-          <p style={{ color: '#c4b5fd', fontSize: '14px' }}>
-            {filteredTransactions.length} transação(ões) encontrada(s)
-          </p>
-        </div>
-
-        <button
-          onClick={() => setIsPanelOpen(true)}
-          style={{
-            background: '#7c3aed',
-            color: 'white',
-            border: 'none',
-            borderRadius: '10px',
-            padding: '10px 20px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer',
-          }}
-        >
-          + Nova Transação
-        </button>
+  return <section className="panel">
+    <div className="panel-heading"><div><h2>Seu extrato</h2><p>Todos os períodos</p></div><span className="count-badge">{filtered.length} registros</span></div>
+    <div className="transaction-toolbar">
+      <div className="segmented" aria-label="Filtrar por tipo">
+        {([{ id: 'all', label: 'Todas' }, { id: 'income', label: 'Receitas' }, { id: 'expense', label: 'Despesas' }] as const).map(item =>
+          <button key={item.id} aria-pressed={filter === item.id} className={filter === item.id ? 'selected' : ''} onClick={() => setFilter(item.id)}>{item.label}</button>)}
       </div>
-
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-        {filterButtons.map(btn => (
-          <button
-            key={btn.id}
-            onClick={() => setFilter(btn.id)}
-            style={{
-              padding: '8px 20px',
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: '500',
-              fontSize: '14px',
-              background: filter === btn.id ? '#7c3aed' : 'rgba(255,255,255,0.1)',
-              color: 'white',
-              transition: 'background 0.2s',
-            }}
-          >
-            {btn.label}
-          </button>
-        ))}
-      </div>
-
-      <TransactionList
-        transactions={filteredTransactions}
-        onDelete={onDelete}
-      />
-
-      <AddTransactionPanel
-        isOpen={isPanelOpen}
-        onClose={() => setIsPanelOpen(false)}
-        onAdd={onAdd}
-      />
+      <label className="search-field"><Icon name="search" size={18} /><input aria-label="Buscar por descrição ou categoria" placeholder="Buscar transação..." value={search} onChange={e => setSearch(e.target.value)} /></label>
     </div>
-  );
+    <TransactionList transactions={filtered} onDelete={onDelete} />
+    {transactions.length === 0 && <div className="empty-action"><button className="button secondary" onClick={onNew}><Icon name="plus" size={17} />Adicionar primeiro lançamento</button></div>}
+    <div className="list-footer"><span>Saldo dos resultados</span><strong>{formatCurrency(net)}</strong></div>
+  </section>;
 }

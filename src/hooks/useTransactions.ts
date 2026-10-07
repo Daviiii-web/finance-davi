@@ -1,18 +1,53 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { Transaction, FinancialSummary } from '../types';
-import initialData from '../data/transactions.json';
 
-const typedInitialData = initialData.transactions as Transaction[];
+
+type LoadResult = {
+  transactions: Transaction[];
+  error: string | null;
+}
+
+function loadTransactions(): LoadResult {
+  try {
+    const saved = localStorage.getItem('transactions');
+
+    if (saved === null) {
+      return { transactions: [], error: null };
+    }
+
+    const data: unknown = JSON.parse(saved);
+
+    if (!Array.isArray(data)) {
+      throw new Error('Os dados salvos não são uma lista');
+    }
+
+    return { transactions: data as Transaction[], error: null };
+  }
+
+  catch (error) {
+    console.error('Erro ao carregar transações:', error);
+    return { transactions: [], error: 'Erro ao carregar transações' };
+  }
+}
+
+
 
 export function useTransactions() {
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('transactions');
-    return saved ? (JSON.parse(saved) as Transaction[]) : typedInitialData;
-  });
+  const [loadResult] = useState<LoadResult>(loadTransactions);
+
+  const [transactions, setTransactions] = useState<Transaction[]>(
+    loadResult.transactions
+  );
+
+  const loadError = loadResult.error;
 
   useEffect(() => {
+    if (loadError !== null) {
+      return;
+    }
+
     localStorage.setItem('transactions', JSON.stringify(transactions));
-  }, [transactions]);
+  }, [transactions, loadError]);
 
   const summary: FinancialSummary = useMemo(() => {
     const income = transactions
@@ -27,6 +62,10 @@ export function useTransactions() {
   }, [transactions]);
 
   function addTransaction(data: Omit<Transaction, 'id'>) {
+    if (loadError !== null) {
+      return;
+    }
+
     const newTransaction: Transaction = {
       ...data,
       id: crypto.randomUUID(),
@@ -35,8 +74,12 @@ export function useTransactions() {
   }
 
   function deleteTransaction(id: string) {
+    if (loadError !== null) {
+      return;
+    }
+
     setTransactions((prev) => prev.filter((t) => t.id !== id));
   }
 
-  return { transactions, summary, addTransaction, deleteTransaction };
+  return { transactions, summary, addTransaction, deleteTransaction, loadError };
 }

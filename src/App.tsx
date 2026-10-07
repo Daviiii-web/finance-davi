@@ -1,160 +1,84 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useTheme } from './hooks/useTheme';
 import { useTransactions } from './hooks/useTransactions';
 import DashboardPage from './pages/DashboardPage';
 import TransactionsPage from './pages/TransactionsPage';
 import StatisticsPage from './pages/StatisticsPage';
+import AddTransactionPanel from './components/Transactions/AddTransactionPanel';
+import Icon from './components/Icon';
 
 type ActiveTab = 'dashboard' | 'transactions' | 'statistics';
-
-const TABS = [
-  { id: 'dashboard',    label: 'Dashboard',    icon: '⊞' },
-  { id: 'transactions', label: 'Transações',   icon: '↕' },
-  { id: 'statistics',   label: 'Estatísticas', icon: '↗' },
+const tabs = [
+  { id: 'dashboard', label: 'Visão geral', icon: 'home' },
+  { id: 'transactions', label: 'Transações', icon: 'arrows' },
+  { id: 'statistics', label: 'Estatísticas', icon: 'chart' },
 ] as const;
 
-function useCurrentDateTime() {
-  const [now, setNow] = useState(new Date());
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return now;
-}
-
 export default function App() {
+  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
-  const { transactions, summary, addTransaction, deleteTransaction } = useTransactions();
-  const now = useCurrentDateTime();
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const { transactions, summary, addTransaction, deleteTransaction, loadError } = useTransactions();
 
-  const formattedDate = now.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-  });
+  const themeButton = (
+    <button type="button" className="theme-toggle" onClick={toggleTheme}
+      aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+      title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}>
+      <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+      <span>{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</span>
+    </button>
+  );
+  if (loadError !== null) {
+    return <main className="error-screen" role="alert">
+      <Icon name="shield" size={36} />{themeButton}
+      <h1>Não foi possível carregar suas transações</h1>
+      <p>O aplicativo bloqueou as alterações para preservar os dados armazenados. Não limpe os dados do navegador.</p>
+    </main>;
+  }
 
-  const formattedTime = now.toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const date = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #6d28d9 100%)',
-      color: 'white',
-      fontFamily: 'system-ui, sans-serif',
-    }}>
+    <div className="app-shell">
+      <a className="skip-link" href="#main-content">Ir para o conteúdo</a>
+      <aside className="sidebar">
+        <a className="brand" href="#main-content" onClick={() => setActiveTab('dashboard')}>
+          <span className="brand-mark"><Icon name="wallet" size={25} /></span>
+          <span>Finanças<span className="brand-subtitle">por Davi</span></span>
+        </a>
+        <p className="nav-label">SEU ESPAÇO</p>
+        <nav className="app-nav" aria-label="Navegação principal">
+          {tabs.map(tab => <button key={tab.id} className={activeTab === tab.id ? 'nav-item active' : 'nav-item'}
+            aria-current={activeTab === tab.id ? 'page' : undefined} onClick={() => setActiveTab(tab.id)}>
+            <Icon name={tab.icon} /><span>{tab.label}</span>
+          </button>)}
+        </nav>
+        <div className="sidebar-note"><Icon name="leaf" size={28} /><strong>Um passo de cada vez.</strong><p>Conhecer seus gastos é o começo de uma vida financeira mais tranquila.</p></div>
+        <div className="profile"><span className="avatar">D</span><div><strong>Davi</strong><small>Finanças pessoais</small></div></div>
+      </aside>
 
-      <header style={{
-        borderBottom: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(0,0,0,0.2)',
-        backdropFilter: 'blur(12px)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 30,
-      }}>
-        <div style={{
-          maxWidth: '1000px',
-          margin: '0 auto',
-          padding: '0 24px',
-          height: '64px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
+      <div className="main-area">
+        <header className="topbar">
+          <span className="breadcrumb">Meu espaço <span>/</span> <strong>{tabs.find(tab => tab.id === activeTab)?.label}</strong></span>
 
-     
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #200352, #4f46e5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '18px',
-              boxShadow: '0 0 12px rgba(124,58,237,0.5)',
-            }}>
-              💰
+          <span className="mobile-brand"><Icon name="wallet" /> Finanças <small>por Davi</small></span>
+          <div className="topbar-actions"><span className="date-label"><Icon name="calendar" size={16} />{date}</span>{themeButton}<span className="mobile-avatar avatar">D</span></div>
+        </header>
+        <main id="main-content" className="main-content" tabIndex={-1}>
+          <div className="page-heading">
+            <div><p className="eyebrow">SUAS FINANÇAS, COM CLAREZA</p>
+              <h1>{activeTab === 'dashboard' ? 'Seu dinheiro, de perto.' : activeTab === 'transactions' ? 'Suas transações' : 'Entenda seus números'}</h1>
+              <p className="muted">{activeTab === 'dashboard' ? 'Uma visão simples de tudo que entra e sai.' : activeTab === 'transactions' ? 'Cada movimento conta. Acompanhe os seus por aqui.' : 'Encontre padrões e acompanhe sua vida financeira.'}</p>
             </div>
-            <div>
-              <p style={{ fontWeight: '700', fontSize: '16px', lineHeight: 1 }}>Financias Davi</p>
-              <p style={{ fontSize: '11px', color: '#a78bfa', lineHeight: 1.4 }}>Controle Financeiro</p>
-            </div>
+            <button className="button primary" onClick={() => setIsPanelOpen(true)}><Icon name="plus" size={18} />Nova transação</button>
           </div>
-
-          <nav style={{
-            display: 'flex',
-            gap: '4px',
-            background: 'rgba(255,255,255,0.07)',
-            borderRadius: '12px',
-            padding: '4px',
-          }}>
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '7px 16px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: activeTab === tab.id ? '600' : '400',
-                  background: activeTab === tab.id
-                    ? 'linear-gradient(135deg, #7c3aed, #4f46e5)'
-                    : 'transparent',
-                  color: activeTab === tab.id ? 'white' : '#c4b5fd',
-                  transition: 'all 0.2s',
-                  boxShadow: activeTab === tab.id
-                    ? '0 2px 8px rgba(124,58,237,0.4)'
-                    : 'none',
-                }}
-              >
-                <span style={{ fontSize: '14px' }}>{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: '13px', fontWeight: '500', color: 'white', lineHeight: 1 }}>
-              {formattedTime}
-            </p>
-            <p style={{ fontSize: '11px', color: '#a78bfa', lineHeight: 1.6, textTransform: 'capitalize' }}>
-              {formattedDate}
-            </p>
-          </div>
-
-        </div>
-      </header>
-
-      <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '32px 24px' }}>
-        {activeTab === 'dashboard' && (
-          <DashboardPage transactions={transactions} summary={summary} />
-        )}
-        {activeTab === 'transactions' && (
-          <TransactionsPage
-            transactions={transactions}
-            onAdd={addTransaction}
-            onDelete={deleteTransaction}
-          />
-        )}
-        {activeTab === 'statistics' && (
-          <StatisticsPage transactions={transactions} />
-        )}
-      </main>
-
-      <footer style={{ textAlign: 'center', padding: '16px 0', color: '#a78bfa', fontSize: '12px' }}>
-        Desenvolvido por Davi Felipe
-      </footer>
-
+          {activeTab === 'dashboard' && <DashboardPage transactions={transactions} summary={summary} onViewAll={() => setActiveTab('transactions')} onNew={() => setIsPanelOpen(true)} />}
+          {activeTab === 'transactions' && <TransactionsPage transactions={transactions} onDelete={deleteTransaction} onNew={() => setIsPanelOpen(true)} />}
+          {activeTab === 'statistics' && <StatisticsPage transactions={transactions} />}
+          <footer className="page-footer"><Icon name="shield" size={15} /> Dados armazenados neste navegador <span>Feito por Davi Felipe</span></footer>
+        </main>
+      </div>
+      <AddTransactionPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} onAdd={addTransaction} />
     </div>
   );
 }

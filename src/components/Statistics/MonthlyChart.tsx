@@ -1,72 +1,34 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useId } from 'react';
 import type { Transaction } from '../../types';
+import { formatCurrency } from '../../format';
+import Icon from '../Icon';
 
-interface MonthlyChartProps {
-    transactions: Transaction[];
-}
+export default function MonthlyChart({ transactions }: { transactions: Transaction[] }) {
+  const gradientId = useId().replace(/:/g, '');
+  const totals = transactions.reduce((acc, t) => {
+    const key = t.date.slice(0, 7);
+    if (!acc[key]) acc[key] = { month: key, income: 0, expense: 0 };
+    acc[key][t.type] += t.amount;
+    return acc;
+  }, {} as Record<string, { month: string; income: number; expense: number }>);
+  const data = Object.values(totals).sort((a, b) => a.month.localeCompare(b.month));
 
-const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-
-export default function MonthlyChart({ transactions }: MonthlyChartProps) {
-    const monthlyData = transactions.reduce((acc, t) => {
-        const date = new Date(t.date + 'T00:00:00');
-        const key = `${date.getFullYear()}-${date.getMonth()}`;
-        const label = `${MONTH_NAMES[date.getMonth()]}/${String(date.getFullYear()).slice(2)}`;
-
-        if (!acc[key]) {
-            acc[key] = { label, income: 0, expense: 0, balance: 0, sortKey: key };
-        }
-
-        if ((t.type as string) === 'income') {
-            acc[key].income += t.amount;
-        } else {
-            acc[key].expense += t.amount;
-        }
-
-        acc[key].balance = acc[key].income - acc[key].expense;
-        return acc;
-    }, {} as Record<string, { label: string; income: number; expense: number; balance: number; sortKey: string }>);
-
-    const data = Object.values(monthlyData)
-        .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-
-    return (
-        <div style={{
-            background: 'rgba(255,255,255,0.08)',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid rgba(255,255,255,0.1)',
-            marginBottom: '24px',
-        }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>
-                Evolução Mensal
-            </h2>
-
-            <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={data}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="label" stroke="#c4b5fd" tick={{ fill: '#c4b5fd', fontSize: 12 }} />
-                    <YAxis stroke="#c4b5fd" tick={{ fill: '#c4b5fd', fontSize: 12 }} />
-                    <Tooltip
-                        contentStyle={{
-                            background: '#2e1065',
-                            border: '1px solid rgba(255,255,255,0.2)',
-                            borderRadius: '8px',
-                            color: 'white',
-                        }}
-                        formatter={(value) => {
-                            if (typeof value === 'number') {
-                                return [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), ''];
-                            }
-                            return [String(value), ''];
-                        }}
-                    />
-                    <Legend wrapperStyle={{ color: '#c4b5fd' }} />
-                    <Line type="monotone" dataKey="income" name="Receitas" stroke="#4ade80" strokeWidth={2} dot={{ fill: '#4ade80' }} />
-                    <Line type="monotone" dataKey="expense" name="Despesas" stroke="#f87171" strokeWidth={2} dot={{ fill: '#f87171' }} />
-                    <Line type="monotone" dataKey="balance" name="Saldo" stroke="#a78bfa" strokeWidth={2} dot={{ fill: '#a78bfa' }} />
-                </LineChart>
-            </ResponsiveContainer>
-        </div>
-    );
+  return <section className="panel chart-panel">
+    <div className="panel-heading"><div><h2>Entradas e saídas</h2><p>Seu movimento ao longo dos meses</p></div><span className="subtle-icon"><Icon name="chart" /></span></div>
+    {data.length === 0 ? <div className="empty-state chart-empty"><Icon name="chart" size={38} /><h3>Sua história começa aqui</h3><p>Registre uma transação para acompanhar sua evolução.</p></div> : <>
+      <div className="chart-legend"><span><i className="legend-income" />Receitas</span><span><i className="legend-expense" />Despesas</span></div>
+      <div className="chart-canvas"><ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
+          <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-income)" stopOpacity={0.18} /><stop offset="100%" stopColor="var(--chart-income)" stopOpacity={0} /></linearGradient></defs>
+          <CartesianGrid strokeDasharray="4 5" vertical={false} stroke="var(--chart-grid)" />
+          <XAxis dataKey="month" tickFormatter={value => { const [year, month] = String(value).split('-'); return month + '/' + year.slice(2); }} axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-tick)', fontSize: 11 }} dy={8} />
+          <YAxis width={58} axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-tick)', fontSize: 11 }} tickFormatter={value => new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value))} />
+          <Tooltip contentStyle={{ background: 'var(--surface)', color: 'var(--chart-tooltip-text)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 13 }} formatter={value => formatCurrency(Number(value))} labelFormatter={value => { const [year, month] = String(value).split('-'); return month + '/' + year; }} />
+          <Area isAnimationActive={false} type="monotone" dataKey="income" name="Receitas" stroke="var(--chart-income)" strokeWidth={2.5} fill={'url(#' + gradientId + ')'} dot={{ r: 3, fill: 'var(--chart-income)', strokeWidth: 0 }} />
+          <Area isAnimationActive={false} type="monotone" dataKey="expense" name="Despesas" stroke="var(--chart-expense)" strokeWidth={2.5} fill="transparent" dot={{ r: 3, fill: 'var(--chart-expense)', strokeWidth: 0 }} />
+        </AreaChart>
+      </ResponsiveContainer></div>
+    </>}
+  </section>;
 }
