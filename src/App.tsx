@@ -44,7 +44,7 @@ export default function App() {
       <aside className="sidebar">
         <a className="brand" href="#main-content" onClick={() => setActiveTab('dashboard')}>
           <span className="brand-mark"><Icon name="wallet" size={25} /></span>
-          <span>Finanças<span className="brand-subtitle">por Davi</span></span>
+          <span>Poupaê<span className="brand-subtitle">Finanças pessoais</span></span>
         </a>
         <p className="nav-label">SEU ESPAÇO</p>
         <nav className="app-nav" aria-label="Navegação principal">
@@ -54,15 +54,15 @@ export default function App() {
           </button>)}
         </nav>
         <div className="sidebar-note"><Icon name="leaf" size={28} /><strong>Um passo de cada vez.</strong><p>Conhecer seus gastos é o começo de uma vida financeira mais tranquila.</p></div>
-        <div className="profile"><span className="avatar">D</span><div><strong>Davi</strong><small>Finanças pessoais</small></div></div>
+        <div className="profile"><span className="avatar">P</span><div><strong>Meu espaço</strong><small>Finanças pessoais</small></div></div>
       </aside>
 
       <div className="main-area">
         <header className="topbar">
           <span className="breadcrumb">Meu espaço <span>/</span> <strong>{tabs.find(tab => tab.id === activeTab)?.label}</strong></span>
 
-          <span className="mobile-brand"><Icon name="wallet" /> Finanças <small>por Davi</small></span>
-          <div className="topbar-actions"><span className="date-label"><Icon name="calendar" size={16} />{date}</span>{themeButton}<span className="mobile-avatar avatar">D</span></div>
+          <span className="mobile-brand"><Icon name="wallet" /> Poupaê</span>
+          <div className="topbar-actions"><span className="date-label"><Icon name="calendar" size={16} />{date}</span>{themeButton}<span className="mobile-avatar avatar">P</span></div>
         </header>
         <main id="main-content" className="main-content" tabIndex={-1}>
           <div className="page-heading">

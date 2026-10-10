@@ -1,6 +1,8 @@
+# Poupaê
+
 PT 
 
-Aplicativo de controle financeiro pessoal desenvolvido com React e TypeScript.
+Poupaê é um aplicativo de controle financeiro pessoal desenvolvido com React e TypeScript.
 
 ## Tecnologias
 
@@ -27,9 +29,9 @@ Aplicativo de controle financeiro pessoal desenvolvido com React e TypeScript.
 
 
 
-**EN** | [PT](#financeflow)
+**EN** | [PT](#poupaê)
 
-Personal finance control app built with React and TypeScript.
+Poupaê is a personal finance app built with React and TypeScript.
 
 ## Tech Stack
 

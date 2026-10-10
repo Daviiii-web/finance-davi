@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark';
-const STORAGE_KEY = 'finance-davi-theme';
+const STORAGE_KEY = 'poupae-theme';
 
 function readTheme(): Theme {
   try {
-    return localStorage.getItem(STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+    // Keep preferences saved before the app was renamed.
+    const saved = localStorage.getItem(STORAGE_KEY)
+      ?? localStorage.getItem('poupaê-theme')
+      ?? localStorage.getItem('finance-davi-theme');
+    return saved === 'dark' ? 'dark' : 'light';
   } catch {
     return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
   }
