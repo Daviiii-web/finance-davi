@@ -7,9 +7,9 @@ type LoadResult = {
   error: string | null;
 }
 
-function loadTransactions(): LoadResult {
+function loadTransactions(storageKey: string): LoadResult {
   try {
-    const saved = localStorage.getItem('transactions');
+    const saved = localStorage.getItem(storageKey);
 
     if (saved === null) {
       return { transactions: [], error: null };
@@ -32,8 +32,10 @@ function loadTransactions(): LoadResult {
 
 
 
-export function useTransactions() {
-  const [loadResult] = useState<LoadResult>(loadTransactions);
+export function useTransactions(userId: string) {
+  // Account-specific storage; legacy data is preserved without assigning it to another user.
+  const storageKey = 'poupae:transactions:' + userId;
+  const [loadResult] = useState<LoadResult>(() => loadTransactions(storageKey));
 
   const [transactions, setTransactions] = useState<Transaction[]>(
     loadResult.transactions
@@ -46,8 +48,8 @@ export function useTransactions() {
       return;
     }
 
-    localStorage.setItem('transactions', JSON.stringify(transactions));
-  }, [transactions, loadError]);
+    localStorage.setItem(storageKey, JSON.stringify(transactions));
+  }, [transactions, loadError, storageKey]);
 
   const summary: FinancialSummary = useMemo(() => {
     const income = transactions
