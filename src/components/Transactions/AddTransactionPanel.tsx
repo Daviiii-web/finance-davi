@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { Transaction, Category, TransactionType } from '../../types';
 import Icon from '../Icon';
+import { amountToCents } from '../../services/transactionService';
 
 interface AddTransactionPanelProps {
   isOpen: boolean;
+  existingTransactions: Transaction[];
   onClose: () => void;
-  onAdd: (data: Omit<Transaction, 'id'>) => void;
+  onAdd: (data: Omit<Transaction, 'id'>) => Promise<void>;
 }
 const categories: Category[] = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Lazer', 'Outros'];
 
@@ -16,9 +18,11 @@ function createInitialForm() {
   return { title: '', amount: '', type: 'expense' as TransactionType, category: 'Outros' as Category, date };
 }
 
-export default function AddTransactionPanel({ isOpen, onClose, onAdd }: AddTransactionPanelProps) {
+export default function AddTransactionPanel({ isOpen, onClose, onAdd, existingTransactions }: AddTransactionPanelProps) {
   const [form, setForm] = useState(createInitialForm);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const saving = useRef(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -32,34 +36,55 @@ export default function AddTransactionPanel({ isOpen, onClose, onAdd }: AddTrans
   }, [isOpen]);
 
   function closePanel() {
+    if (saving.current) return;
     setError(null);
     setForm(createInitialForm());
     onClose();
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving.current) return;
+    setError(null);
     if (!form.title.trim()) { setError('Digite um título para criar a transação!'); return; }
     if (!form.amount || !form.date) { setError('Preencha o valor e a data.'); return; }
     const amount = Number(form.amount);
     if (!Number.isFinite(amount) || amount <= 0) { setError('O valor deve ser um número maior que zero!'); return; }
-    onAdd({ title: form.title.trim(), amount, type: form.type, category: form.category, date: form.date });
-    closePanel();
+    try { amountToCents(amount); } catch (error) {
+      setError(error instanceof Error ? error.message : 'Confira o valor informado.');
+      return;
+    }
+    const similar = existingTransactions.some(t =>
+      t.title.trim().toLocaleLowerCase('pt-BR') === form.title.trim().toLocaleLowerCase('pt-BR') &&
+      Math.round(t.amount * 100) === Math.round(amount * 100) && t.type === form.type && t.date === form.date);
+    if (similar && !window.confirm('Já existe um lançamento com a mesma descrição, valor, tipo e data. Deseja cadastrar outro mesmo assim?')) return;
+    saving.current = true;
+    setIsSaving(true);
+    try {
+      await onAdd({ title: form.title.trim(), amount, type: form.type, category: form.category, date: form.date });
+      saving.current = false;
+      closePanel();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Não foi possível salvar. Tente novamente.');
+    } finally {
+      saving.current = false;
+      setIsSaving(false);
+    }
   }
 
   return <dialog ref={dialogRef} className="transaction-dialog" aria-labelledby="transaction-dialog-title" onCancel={event => { event.preventDefault(); closePanel(); }} onClick={event => { if (event.target === event.currentTarget) closePanel(); }}>
     <div className="dialog-content">
-      <div className="dialog-heading"><div><p className="eyebrow">ORGANIZE SEU DIA A DIA</p><h2 id="transaction-dialog-title">Nova transação</h2></div><button className="icon-button" aria-label="Fechar formulário" onClick={closePanel}><Icon name="close" /></button></div>
-      <form onSubmit={handleSubmit} noValidate>
-        <fieldset className="type-fieldset"><legend>Tipo de movimentação</legend><div className="type-options">{(['expense', 'income'] as const).map(type => <button type="button" key={type} aria-pressed={form.type === type} className={form.type === type ? 'type-option selected ' + type : 'type-option'} onClick={() => setForm(prev => ({ ...prev, type }))}><Icon name={type === 'income' ? 'down' : 'up'} size={18} />{type === 'income' ? 'Receita' : 'Despesa'}</button>)}</div></fieldset>
+      <div className="dialog-heading"><div><p className="eyebrow">ORGANIZE SEU DIA A DIA</p><h2 id="transaction-dialog-title">Nova transação</h2></div><button className="icon-button" aria-label="Fechar formulário" disabled={isSaving} onClick={closePanel}><Icon name="close" /></button></div>
+      <p className="offline-form-note">Salvamos primeiro neste dispositivo. O envio para sua conta acontece quando houver conexão.</p><form onSubmit={handleSubmit} noValidate aria-busy={isSaving}>
+        <fieldset className="type-fieldset" disabled={isSaving}><legend>Tipo de movimentação</legend><div className="type-options">{(['expense', 'income'] as const).map(type => <button type="button" key={type} aria-pressed={form.type === type} className={form.type === type ? 'type-option selected ' + type : 'type-option'} onClick={() => setForm(prev => ({ ...prev, type }))}><Icon name={type === 'income' ? 'down' : 'up'} size={18} />{type === 'income' ? 'Receita' : 'Despesa'}</button>)}</div></fieldset>
         <label className="form-label" htmlFor="transaction-amount">Valor da transação</label>
-        <div className="amount-field"><span>R$</span><input id="transaction-amount" type="number" inputMode="decimal" placeholder="0,00" min="0.01" step="0.01" required value={form.amount} onChange={e => setForm(prev => ({ ...prev, amount: e.target.value }))} /></div>
+        <div className="amount-field"><span>R$</span><input id="transaction-amount" type="number" inputMode="decimal" placeholder="0,00" min="0.01" step="0.01" required disabled={isSaving} value={form.amount} onChange={e => setForm(prev => ({ ...prev, amount: e.target.value }))} /></div>
         <label className="form-label" htmlFor="transaction-title">Descrição</label>
-        <input className="form-input" id="transaction-title" placeholder="Ex.: Compras do mercado" required value={form.title} onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))} />
-        <div className="form-grid"><div><label className="form-label" htmlFor="transaction-category">Categoria</label><select className="form-input" id="transaction-category" value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value as Category }))}>{categories.map(category => <option key={category}>{category}</option>)}</select></div>
-          <div><label className="form-label" htmlFor="transaction-date">Data</label><input className="form-input" id="transaction-date" type="date" required value={form.date} onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))} /></div></div>
+        <input className="form-input" id="transaction-title" placeholder="Ex.: Compras do mercado" required disabled={isSaving} value={form.title} onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))} />
+        <div className="form-grid"><div><label className="form-label" htmlFor="transaction-category">Categoria</label><select className="form-input" id="transaction-category" disabled={isSaving} value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value as Category }))}>{categories.map(category => <option key={category}>{category}</option>)}</select></div>
+          <div><label className="form-label" htmlFor="transaction-date">Data</label><input className="form-input" id="transaction-date" type="date" required disabled={isSaving} value={form.date} onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))} /></div></div>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="dialog-actions"><button type="button" className="button secondary" onClick={closePanel}>Cancelar</button><button type="submit" className="button primary"><Icon name="plus" size={18} />Salvar transação</button></div>
+        <div className="dialog-actions"><button type="button" className="button secondary" disabled={isSaving} onClick={closePanel}>Cancelar</button><button type="submit" className="button primary" disabled={isSaving}><Icon name="plus" size={18} />{isSaving ? 'Salvando...' : 'Salvar transação'}</button></div>
       </form>
     </div>
   </dialog>;

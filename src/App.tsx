@@ -11,6 +11,7 @@ import TransactionsPage from './pages/TransactionsPage';
 import StatisticsPage from './pages/StatisticsPage';
 import AddTransactionPanel from './components/Transactions/AddTransactionPanel';
 import Icon from './components/Icon';
+import LocalTransactionsImport from './components/Transactions/LocalTransactionsImport';
 
 type ActiveTab = 'dashboard' | 'transactions' | 'statistics';
 const tabs = [
@@ -47,7 +48,11 @@ function FinanceApp({ user, theme, toggleTheme }: {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const { transactions, summary, addTransaction, deleteTransaction, loadError } = useTransactions(user.id);
+  const {
+    transactions, summary, addTransaction, deleteTransaction, importLocalTransactions,
+    isLoading, isRefreshing, isMutating, isOffline, lastUpdated, loadError, mutationError, refresh, storageError, hasLocalAccount, pendingCount, pendingIds, pendingDeletes,
+  } = useTransactions(user.id);
+  const cannotWrite = isLoading || isMutating || storageError !== null;
 
   const themeButton = <ThemeToggle theme={theme} onToggle={toggleTheme} />;
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -57,6 +62,7 @@ function FinanceApp({ user, theme, toggleTheme }: {
 
   async function handleSignOut() {
     if (isSigningOut) return;
+    if (pendingCount > 0 && !window.confirm('Existem alterações ainda não enviadas. Elas continuarão neste dispositivo e serão enviadas quando você entrar novamente nesta conta. Deseja sair?')) return;
     setIsSigningOut(true);
     setSignOutError('');
     try {
@@ -72,11 +78,19 @@ function FinanceApp({ user, theme, toggleTheme }: {
     disabled={isSigningOut} onClick={handleSignOut} aria-label="Sair da conta" title="Sair da conta">
     <Icon name="logout" size={18} />
   </button>;
-  if (loadError !== null) {
-    return <main className="error-screen" role="alert">
-      <Icon name="shield" size={36} />{themeButton}{logoutButton}{signOutError && <p className="form-error">{signOutError}</p>}
-      <h1>Não foi possível carregar suas transações</h1>
-      <p>O aplicativo bloqueou as alterações para preservar os dados armazenados. Não limpe os dados do navegador.</p>
+  if (isLoading) {
+    return <main className="auth-loading" role="status">{themeButton}{logoutButton}
+      <Icon name="wallet" size={36} /><h1>Carregando seus lançamentos...</h1>
+      <p>Abrindo os lançamentos deste dispositivo.</p>
+      {signOutError && <p className="form-error">{signOutError}</p>}
+    </main>;
+  }
+  if (!hasLocalAccount && storageError) {
+    return <main className="auth-loading" role="alert">{themeButton}{logoutButton}
+      <Icon name="shield" size={36} /><h1>Não foi possível carregar suas transações</h1>
+      <p>{storageError}</p><p>Seus dados locais foram preservados.</p>
+      {signOutError && <p className="form-error">{signOutError}</p>}
+      <button className="button primary" disabled={isRefreshing} onClick={() => void refresh()}>{isRefreshing ? 'Atualizando...' : 'Tentar novamente'}</button>
     </main>;
   }
 
@@ -114,15 +128,25 @@ function FinanceApp({ user, theme, toggleTheme }: {
               <h1>{activeTab === 'dashboard' ? 'Seu dinheiro, de perto.' : activeTab === 'transactions' ? 'Suas transações' : 'Entenda seus números'}</h1>
               <p className="muted">{activeTab === 'dashboard' ? 'Uma visão simples de tudo que entra e sai.' : activeTab === 'transactions' ? 'Cada movimento conta. Acompanhe os seus por aqui.' : 'Encontre padrões e acompanhe sua vida financeira.'}</p>
             </div>
-            <button className="button primary" onClick={() => setIsPanelOpen(true)}><Icon name="plus" size={18} />Nova transação</button>
+            <button className="button primary" disabled={cannotWrite} onClick={() => setIsPanelOpen(true)}><Icon name="plus" size={18} />Nova transação</button>
           </div>
-          {activeTab === 'dashboard' && <DashboardPage transactions={transactions} summary={summary} onViewAll={() => setActiveTab('transactions')} onNew={() => setIsPanelOpen(true)} />}
-          {activeTab === 'transactions' && <TransactionsPage transactions={transactions} onDelete={deleteTransaction} onNew={() => setIsPanelOpen(true)} />}
+          <div className="sync-status" aria-live="polite">
+            <div><span>{isOffline ? 'Sem conexão. Você pode cadastrar e excluir neste dispositivo.' : isRefreshing ? 'Sincronizando com sua conta...' : lastUpdated ? 'Última consulta às ' + lastUpdated.toLocaleTimeString('pt-BR') : 'O histórico completo será consultado quando houver conexão.'}</span>
+              {pendingCount > 0 && <p className="sync-detail">{pendingCount} alteração(ões) pendente(s) de envio. {pendingDeletes > 0 && pendingDeletes + ' exclusão(ões) aguardando confirmação.'}</p>}
+            </div>
+            <button type="button" className="text-button" disabled={isRefreshing || isMutating || isOffline} onClick={() => void refresh()}>Sincronizar agora</button>
+          </div>
+          {loadError && <p className="form-error session-error" role="alert">{loadError} As alterações pendentes continuam neste dispositivo para uma nova tentativa.</p>}
+          {storageError && <p className="form-error session-error" role="alert">{storageError}</p>}
+          {mutationError && <p className="form-error session-error" role="alert">{mutationError}</p>}
+          <LocalTransactionsImport userId={user.id} email={user.email || 'atual'} disabled={cannotWrite || isOffline || isRefreshing || pendingCount > 0} onImport={importLocalTransactions} />
+          {activeTab === 'dashboard' && <DashboardPage pendingIds={pendingIds} isBusy={cannotWrite} transactions={transactions} summary={summary} onViewAll={() => setActiveTab('transactions')} onNew={() => setIsPanelOpen(true)} />}
+          {activeTab === 'transactions' && <TransactionsPage pendingIds={pendingIds} isBusy={cannotWrite} transactions={transactions} onDelete={deleteTransaction} onNew={() => setIsPanelOpen(true)} />}
           {activeTab === 'statistics' && <StatisticsPage transactions={transactions} />}
-          <footer className="page-footer"><Icon name="shield" size={15} /> Dados desta conta armazenados neste navegador <span>Feito por Davi Felipe</span></footer>
+          <footer className="page-footer"><Icon name="shield" size={15} /> Salvo neste dispositivo · Confira as pendências de envio acima <span>Feito por Davi Felipe</span></footer>
         </main>
       </div>
-      <AddTransactionPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} onAdd={addTransaction} />
+      <AddTransactionPanel existingTransactions={transactions} isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} onAdd={addTransaction} />
     </div>
   );
 }

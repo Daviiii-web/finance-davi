@@ -6,12 +6,14 @@ import { formatCurrency } from '../format';
 
 interface TransactionsPageProps {
   transactions: Transaction[];
-  onDelete: (id: string) => void;
+  pendingIds?: Set<string>;
+  onDelete: (id: string) => Promise<void>;
+  isBusy: boolean;
   onNew: () => void;
 }
 type FilterType = 'all' | 'income' | 'expense';
 
-export default function TransactionsPage({ transactions, onDelete, onNew }: TransactionsPageProps) {
+export default function TransactionsPage({ transactions, onDelete, onNew, isBusy, pendingIds }: TransactionsPageProps) {
   const [filter, setFilter] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
   const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
@@ -30,8 +32,8 @@ export default function TransactionsPage({ transactions, onDelete, onNew }: Tran
       </div>
       <label className="search-field"><Icon name="search" size={18} /><input aria-label="Buscar por descrição ou categoria" placeholder="Buscar transação..." value={search} onChange={e => setSearch(e.target.value)} /></label>
     </div>
-    <TransactionList transactions={filtered} onDelete={onDelete} />
-    {transactions.length === 0 && <div className="empty-action"><button className="button secondary" onClick={onNew}><Icon name="plus" size={17} />Adicionar primeiro lançamento</button></div>}
+    <TransactionList pendingIds={pendingIds} transactions={filtered} onDelete={onDelete} isBusy={isBusy} />
+    {transactions.length === 0 && <div className="empty-action"><button className="button secondary" disabled={isBusy} onClick={onNew}><Icon name="plus" size={17} />Adicionar primeiro lançamento</button></div>}
     <div className="list-footer"><span>Saldo dos resultados</span><strong>{formatCurrency(net)}</strong></div>
   </section>;
 }

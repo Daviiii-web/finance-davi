@@ -7,12 +7,14 @@ import Icon from '../components/Icon';
 
 interface DashboardPageProps {
   transactions: Transaction[];
+  pendingIds?: Set<string>;
   summary: FinancialSummary;
   onViewAll: () => void;
   onNew: () => void;
+  isBusy: boolean;
 }
 
-export default function DashboardPage({ transactions, summary, onViewAll, onNew }: DashboardPageProps) {
+export default function DashboardPage({ transactions, summary, onViewAll, onNew, isBusy, pendingIds }: DashboardPageProps) {
   const recent = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
   return <div className="page-stack">
     <SummaryCards summary={summary} />
@@ -20,8 +22,8 @@ export default function DashboardPage({ transactions, summary, onViewAll, onNew 
     <div className="dashboard-charts"><MonthlyChart transactions={transactions} /><CategoryBarChart transactions={transactions} /></div>
     <section className="panel">
       <div className="panel-heading"><div><h2>Últimas transações</h2><p>Os movimentos mais recentes por data</p></div><button className="text-button" onClick={onViewAll}>Ver todas <Icon name="chevron" size={16} /></button></div>
-      <TransactionList transactions={recent} />
-      {transactions.length === 0 && <div className="empty-action"><button className="button secondary" onClick={onNew}><Icon name="plus" size={17} />Registrar meu primeiro lançamento</button></div>}
+      <TransactionList pendingIds={pendingIds} transactions={recent} />
+      {transactions.length === 0 && <div className="empty-action"><button className="button secondary" disabled={isBusy} onClick={onNew}><Icon name="plus" size={17} />Registrar meu primeiro lançamento</button></div>}
     </section>
   </div>;
 }

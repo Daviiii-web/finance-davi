@@ -59,6 +59,4 @@ Poupaê is a personal finance app built with React and TypeScript.
 
 Made by [Davi](https://github.com/Daviiii-web)
 
-## Autenticação
 
-Veja o [guia de autenticação](AUTH.md) para entender o código, configurar os links de e-mail e testar os fluxos de acesso.
