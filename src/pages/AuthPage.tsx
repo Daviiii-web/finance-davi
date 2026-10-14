@@ -14,7 +14,7 @@ interface AuthPageProps {
   onRecoveryComplete: () => void;
 }
 const copy = {
-  signin: { title: 'Bom ter você de volta.', subtitle: 'Entre para cuidar do que é seu.', button: 'Entrar na minha conta' },
+  signin: { title: 'Hora de organizar suas finanças.', subtitle: 'Entre para cuidar do que é seu.', button: 'Entrar na minha conta' },
   signup: { title: 'Seu próximo passo começa aqui.', subtitle: 'Crie sua conta e organize a sua vida financeira.', button: 'Criar minha conta' },
   forgot: { title: 'Vamos recuperar seu acesso.', subtitle: 'Enviaremos um link para você criar uma nova senha.', button: 'Enviar link de recuperação' },
   reset: { title: 'Uma nova senha, um novo começo.', subtitle: 'Escolha uma senha para voltar à sua conta.', button: 'Salvar nova senha' },

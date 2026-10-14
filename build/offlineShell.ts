@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Plugin } from 'vite';
 
-// Cache only the built application shell. Account data stays in IndexedDB.
 export function offlineShell(): Plugin {
   return {
     name: 'poupae-offline-shell',
@@ -52,7 +51,6 @@ self.addEventListener('fetch', event => {
       (await cache.match(request, { ignoreVary: true })) || fetch(request)));
   }
 });
-// Do not force an update over an open app: pending forms and the current JS stay together.
 `,
       });
     },

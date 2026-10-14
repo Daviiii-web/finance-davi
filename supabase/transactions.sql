@@ -1,6 +1,3 @@
--- Execute no SQL Editor do seu projeto Supabase.
--- Cria uma tabela nova ou preserva a tabela existente e seus registros.
--- Se a tabela já existir, confira se possui as colunas abaixo antes de executar.
 begin;
 
 create table if not exists public.transactions (
@@ -9,7 +6,7 @@ create table if not exists public.transactions (
   title text not null check (length(trim(title)) > 0),
   amount_cents integer not null check (amount_cents > 0),
   type text not null check (type in ('income', 'expense')),
-  category text not null check (category in ('Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Lazer', 'Outros')),
+  category text not null check (char_length(category) between 1 and 60 and category = btrim(category) and category !~ '[[:cntrl:]]'),
   date date not null,
   created_at timestamptz not null default now()
 );
@@ -19,8 +16,6 @@ alter table public.transactions enable row level security;
 grant select, insert, delete on public.transactions to authenticated;
 revoke all on public.transactions from anon;
 
--- A regra restritiva também limita eventuais políticas permissivas já existentes.
--- Não se aplica ao administrador/service_role: essas credenciais nunca vão no frontend.
 drop policy if exists "poupae_owner_guard" on public.transactions;
 create policy "poupae_owner_guard" on public.transactions
   as restrictive for all to public

@@ -46,7 +46,6 @@ export async function resendConfirmation(email: string) {
   if (error) throw error;
 }
 
-// Keep provider-specific error codes out of the interface.
 export function getAuthErrorMessage(error: unknown): string {
   const messages: Record<string, string> = {
     invalid_credentials: 'E-mail ou senha incorretos. Confira os dados e tente novamente.',

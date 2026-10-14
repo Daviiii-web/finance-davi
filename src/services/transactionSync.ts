@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
-import { readAccount, acknowledgeChange, saveRemoteSnapshot } from '../lib/offlineTransactions';
+import { readAccount, acknowledgeChange, saveRemoteSnapshot, acknowledgeCategory, saveRemoteCategories } from '../lib/offlineTransactions';
+import { createCategory, listCategories } from './categoryService';
 import { createTransaction, listTransactions, removeTransaction } from './transactionService';
 
 export async function requireAccount(userId: string, signal: AbortSignal) {
@@ -40,6 +41,17 @@ export async function syncAccount(userId: string, signal: AbortSignal) {
     await requireAccount(userId, signal);
     const rows = await listTransactions(userId, AbortSignal.any([signal, AbortSignal.timeout(20000)]));
     signal.throwIfAborted();
-    return saveRemoteSnapshot(userId, rows);
+    await saveRemoteSnapshot(userId, rows);
+    const latest = await readAccount(userId);
+    for (const name of latest.pendingCategories) {
+      await requireAccount(userId, signal);
+      const saved = await createCategory(userId, name, AbortSignal.any([signal, AbortSignal.timeout(20000)]));
+      signal.throwIfAborted();
+      await acknowledgeCategory(userId, name, saved);
+    }
+    await requireAccount(userId, signal);
+    const categories = await listCategories(userId, AbortSignal.any([signal, AbortSignal.timeout(20000)]));
+    signal.throwIfAborted();
+    return saveRemoteCategories(userId, categories);
   });
 }

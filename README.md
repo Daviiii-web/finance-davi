@@ -1,6 +1,6 @@
 # Poupaê
 
-PT 
+PT
 
 Poupaê é um aplicativo de controle financeiro pessoal desenvolvido com React e TypeScript.
 
@@ -60,3 +60,12 @@ Poupaê is a personal finance app built with React and TypeScript.
 Made by [Davi](https://github.com/Daviiii-web)
 
 
+
+## Feedback e relatos de bugs
+
+O botão Feedback permite enviar relatos e sugestões por e-mail. A ativação do envio na Vercel, no Resend e no Supabase está explicada em [FEEDBACK.md](./FEEDBACK.md).
+
+
+## Categorias personalizadas
+
+Crie categorias por conta, inclusive offline. Antes de publicar esta versão, execute a migração indicada em [CATEGORIAS.md](./CATEGORIAS.md). O guia também explica o componente, as regras e a sincronização.

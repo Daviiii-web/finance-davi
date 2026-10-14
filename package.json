@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test:categories": "node --test tests/categories.test.mjs",
+    "test:feedback": "node --test tests/feedback-api.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

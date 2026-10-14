@@ -1,4 +1,5 @@
 import type { Transaction } from '../types';
+import { categoryKey, categoryOptions, isCategoryName, isDefaultCategory, mergeCategories, validateCategoryName } from '../categories';
 import { isTransaction } from '../services/transactionService';
 
 export interface PendingChange {
@@ -12,6 +13,8 @@ export interface OfflineAccount {
   remote: Transaction[];
   pending: PendingChange[];
   lastSyncedAt: string | null;
+  categories: string[];
+  pendingCategories: string[];
 }
 
 export class OfflineStorageError extends Error {
@@ -22,7 +25,7 @@ export class OfflineStorageError extends Error {
 }
 
 export function emptyAccount(userId: string): OfflineAccount {
-  return { userId, revision: 0, remote: [], pending: [], lastSyncedAt: null };
+  return { userId, revision: 0, remote: [], pending: [], lastSyncedAt: null, categories: [], pendingCategories: [] };
 }
 
 let opening: Promise<IDBDatabase> | undefined;
@@ -48,6 +51,8 @@ function validateAccount(value: unknown, userId: string): OfflineAccount {
   if (value === undefined) return emptyAccount(userId);
   const account = value as OfflineAccount | null;
   if (!account || account.userId !== userId || !Number.isSafeInteger(account.revision) ||
+      (account.categories !== undefined && (!Array.isArray(account.categories) || !account.categories.every(isCategoryName))) ||
+      (account.pendingCategories !== undefined && (!Array.isArray(account.pendingCategories) || !account.pendingCategories.every(isCategoryName))) ||
       account.revision < 0 || !Array.isArray(account.remote) || !account.remote.every(isTransaction) ||
       !Array.isArray(account.pending) || !account.pending.every(change => change &&
         typeof change.operationId === 'string' && (change.kind === 'create' || change.kind === 'delete') &&
@@ -58,10 +63,9 @@ function validateAccount(value: unknown, userId: string): OfflineAccount {
         !Number.isFinite(Date.parse(account.lastSyncedAt))))) {
     throw new OfflineStorageError('Os dados locais precisam de revisão. Não limpe o armazenamento do navegador: ele pode conter lançamentos ainda não enviados.');
   }
-  return account;
+  return { ...account, categories: account.categories ?? [], pendingCategories: account.pendingCategories ?? [] };
 }
 
-// Financial data is not included in notifications; each tab rereads its own account.
 function notify(userId: string) {
   window.dispatchEvent(new CustomEvent('poupae-offline-change', { detail: userId }));
   if (typeof BroadcastChannel !== 'undefined') {
@@ -101,7 +105,6 @@ async function accessAccount(
         } catch (error) { failure = error; transaction.abort(); }
       };
       transaction.oncomplete = () => {
-        // A request's onsuccess alone does not confirm the transaction was committed.
         resolve(result);
         if (update) notify(userId);
       };
@@ -127,6 +130,7 @@ export function visibleTransactions(account: OfflineAccount): Transaction[] {
 export function enqueueChange(userId: string, kind: PendingChange['kind'], item: Transaction) {
   if (!isTransaction(item)) return Promise.reject(new Error('Confira os dados da transação.'));
   return accessAccount(userId, account => {
+    if (kind === 'create') rememberCategory(account, item.category);
     account.pending.push({ operationId: crypto.randomUUID(), kind, transaction: item });
   });
 }
@@ -143,7 +147,46 @@ export function acknowledgeChange(userId: string, change: PendingChange, saved?:
 export function saveRemoteSnapshot(userId: string, remote: Transaction[]) {
   return accessAccount(userId, account => {
     account.remote = remote;
+    for (const name of mergeCategories(remote.map(item => item.category))) rememberCategory(account, name);
     account.lastSyncedAt = new Date().toISOString();
-    // Never replace the outbox with a network snapshot.
+  });
+}
+
+export function visibleCategories(account: OfflineAccount): string[] {
+  return categoryOptions(account.categories, account.pendingCategories, visibleTransactions(account).map(item => item.category));
+}
+
+function rememberCategory(account: OfflineAccount, value: string): string {
+  const name = validateCategoryName(value);
+  const key = categoryKey(name);
+  const canonical = categoryOptions(account.categories, account.pendingCategories).find(item => categoryKey(item) === key) ?? name;
+  if (!isDefaultCategory(canonical) && !account.categories.some(item => categoryKey(item) === key)) {
+    account.categories.push(canonical);
+    if (!account.pendingCategories.some(item => categoryKey(item) === key)) account.pendingCategories.push(canonical);
+  }
+  return canonical;
+}
+
+export async function enqueueCategory(userId: string, value: string) {
+  const name = validateCategoryName(value);
+  let canonical = name;
+  const account = await accessAccount(userId, current => { canonical = rememberCategory(current, name); });
+  return { account, name: canonical };
+}
+
+export function acknowledgeCategory(userId: string, pending: string, saved: string) {
+  if (!isCategoryName(saved) || categoryKey(saved) !== categoryKey(pending)) {
+    return Promise.reject(new Error('Não foi possível confirmar a categoria. Ela foi preservada neste dispositivo.'));
+  }
+  return accessAccount(userId, account => {
+    const key = categoryKey(pending);
+    account.categories = mergeCategories([saved], account.categories.filter(name => categoryKey(name) !== key));
+    account.pendingCategories = account.pendingCategories.filter(name => categoryKey(name) !== key);
+  });
+}
+
+export function saveRemoteCategories(userId: string, remote: string[]) {
+  return accessAccount(userId, account => {
+    account.categories = mergeCategories(remote, account.categories);
   });
 }
