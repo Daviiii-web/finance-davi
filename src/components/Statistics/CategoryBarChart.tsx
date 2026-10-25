@@ -1,15 +1,21 @@
 import type { Transaction } from '../../types';
 import { formatCurrency } from '../../format';
 import Icon from '../Icon';
+import { categoryKey } from '../../categories';
 
 const colors = ['#16866b', '#64a894', '#d1a16a', '#83a2c3', '#ac98bb', '#acb6b0'];
 
 export default function CategoryBarChart({ transactions }: { transactions: Transaction[] }) {
-  const totals = transactions.filter(t => t.type === 'expense').reduce((acc, t) => {
-    acc[t.category] = (acc[t.category] || 0) + t.amount;
-    return acc;
-  }, {} as Record<string, number>);
-  const data = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+
+  const totals = new Map<string, { name: string; cents: number }>();
+  for (const transaction of transactions.filter(item => item.type === 'expense')) {
+    const key = categoryKey(transaction.category);
+    const group = totals.get(key) ?? { name: transaction.category, cents: 0 };
+    group.cents += Math.round(transaction.amount * 100);
+    totals.set(key, group);
+  }
+  const data: [string, number][] = [...totals.values()].sort((a, b) => b.cents - a.cents)
+    .map(group => [group.name, group.cents / 100]);
   const total = data.reduce((sum, [, value]) => sum + value, 0);
 
   return <section className="panel category-panel">

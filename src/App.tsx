@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import FeedbackWidget from './components/FeedbackWidget';
 import type { User } from '@supabase/supabase-js';
 import { useAuth } from './hooks/useAuth';
 import { signOut, getAuthErrorMessage } from './services/authService';
@@ -36,8 +37,10 @@ export default function App() {
       themeControl={themeControl} recovery={Boolean(session && isRecovering)}
       recoveryUnavailable={recoveryUnavailable} onRecoveryComplete={finishRecovery} />;
   }
-  // Remount all financial state when the account changes, so data cannot leak between accounts.
-  return <FinanceApp key={session.user.id} user={session.user} theme={theme} toggleTheme={toggleTheme} />;
+  return <>
+    <FinanceApp key={'finance-' + session.user.id} user={session.user} theme={theme} toggleTheme={toggleTheme} />
+    <FeedbackWidget key={'feedback-' + session.user.id} />
+  </>;
 }
 
 function FinanceApp({ user, theme, toggleTheme }: {
@@ -49,7 +52,7 @@ function FinanceApp({ user, theme, toggleTheme }: {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const {
-    transactions, summary, addTransaction, deleteTransaction, importLocalTransactions,
+    transactions, summary, addTransaction, deleteTransaction, importLocalTransactions, categories, addCategory,
     isLoading, isRefreshing, isMutating, isOffline, lastUpdated, loadError, mutationError, refresh, storageError, hasLocalAccount, pendingCount, pendingIds, pendingDeletes,
   } = useTransactions(user.id);
   const cannotWrite = isLoading || isMutating || storageError !== null;
@@ -146,7 +149,7 @@ function FinanceApp({ user, theme, toggleTheme }: {
           <footer className="page-footer"><Icon name="shield" size={15} /> Salvo neste dispositivo · Confira as pendências de envio acima <span>Feito por Davi Felipe</span></footer>
         </main>
       </div>
-      <AddTransactionPanel existingTransactions={transactions} isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} onAdd={addTransaction} />
+      <AddTransactionPanel categories={categories} onCreateCategory={addCategory} existingTransactions={transactions} isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} onAdd={addTransaction} />
     </div>
   );
 }

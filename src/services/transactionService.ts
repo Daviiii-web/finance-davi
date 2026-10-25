@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { isCategoryName } from '../categories';
 import type { Transaction } from '../types';
 
 function requestSignal(signal?: AbortSignal): AbortSignal {
@@ -6,7 +7,6 @@ function requestSignal(signal?: AbortSignal): AbortSignal {
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 const COLUMNS = 'id,user_id,title,amount_cents,type,category,date';
-const CATEGORIES = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Lazer', 'Outros'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function amountToCents(amount: number): number {
@@ -25,7 +25,7 @@ export function isTransaction(value: unknown): value is Transaction {
       typeof t.title !== 'string' || !t.title.trim() ||
       typeof t.amount !== 'number' || !Number.isFinite(t.amount) ||
       (t.type !== 'income' && t.type !== 'expense') ||
-      typeof t.category !== 'string' || !CATEGORIES.includes(t.category) ||
+      !isCategoryName(t.category) ||
       typeof t.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return false;
   const date = new Date(t.date + 'T00:00:00Z');
   if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== t.date) return false;
@@ -57,7 +57,6 @@ function toRow(transaction: Transaction, userId: string) {
 export async function listTransactions(userId: string, signal: AbortSignal): Promise<Transaction[]> {
   const transactions: Transaction[] = [];
   let cursor: string | undefined;
-  // Keyset pagination avoids silently truncating accounts with more than 1,000 records.
   while (true) {
     let query = supabase.from('transactions').select(COLUMNS)
       .eq('user_id', userId).order('id', { ascending: true }).limit(500);
@@ -72,7 +71,6 @@ export async function listTransactions(userId: string, signal: AbortSignal): Pro
 }
 
 export async function createTransaction(userId: string, transaction: Transaction, signal?: AbortSignal): Promise<Transaction> {
-  // Retrying the same draft cannot insert it twice. This never updates existing rows.
   const { error } = await supabase.from('transactions')
     .upsert(toRow(transaction, userId), { onConflict: 'id', ignoreDuplicates: true })
     .abortSignal(requestSignal(signal));
@@ -92,7 +90,6 @@ export async function removeTransaction(userId: string, id: string, signal?: Abo
   const { error } = await supabase.from('transactions').delete()
     .eq('user_id', userId).eq('id', id).abortSignal(requestSignal(signal));
   if (error) throw error;
-  // A policy can silently hide a row from DELETE; don't report success if it remains.
   const check = await supabase.from('transactions').select('id')
     .eq('user_id', userId).eq('id', id).abortSignal(requestSignal(signal)).maybeSingle();
   if (check.error) throw check.error;

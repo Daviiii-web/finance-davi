@@ -2,15 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { Transaction, Category, TransactionType } from '../../types';
 import Icon from '../Icon';
+import CategoryPicker from './CategoryPicker';
+import { categoryKey } from '../../categories';
 import { amountToCents } from '../../services/transactionService';
 
 interface AddTransactionPanelProps {
   isOpen: boolean;
   existingTransactions: Transaction[];
+  categories: string[];
+  onCreateCategory: (name: string) => Promise<string>;
   onClose: () => void;
   onAdd: (data: Omit<Transaction, 'id'>) => Promise<void>;
 }
-const categories: Category[] = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Lazer', 'Outros'];
 
 function createInitialForm() {
   const now = new Date();
@@ -18,10 +21,13 @@ function createInitialForm() {
   return { title: '', amount: '', type: 'expense' as TransactionType, category: 'Outros' as Category, date };
 }
 
-export default function AddTransactionPanel({ isOpen, onClose, onAdd, existingTransactions }: AddTransactionPanelProps) {
+export default function AddTransactionPanel({ isOpen, onClose, onAdd, existingTransactions, categories, onCreateCategory }: AddTransactionPanelProps) {
   const [form, setForm] = useState(createInitialForm);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const isBusy = isSaving || isCreatingCategory;
+  const selectedCategory = categories.find(name => categoryKey(name) === categoryKey(form.category)) ?? form.category;
   const saving = useRef(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -42,6 +48,13 @@ export default function AddTransactionPanel({ isOpen, onClose, onAdd, existingTr
     onClose();
   }
 
+  async function handleCreateCategory(name: string): Promise<string> {
+    if (saving.current) throw new Error('Aguarde a gravação atual terminar.');
+    saving.current = true;
+    setIsCreatingCategory(true);
+    try { return await onCreateCategory(name); }
+    finally { saving.current = false; setIsCreatingCategory(false); }
+  }
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving.current) return;
@@ -61,7 +74,7 @@ export default function AddTransactionPanel({ isOpen, onClose, onAdd, existingTr
     saving.current = true;
     setIsSaving(true);
     try {
-      await onAdd({ title: form.title.trim(), amount, type: form.type, category: form.category, date: form.date });
+      await onAdd({ title: form.title.trim(), amount, type: form.type, category: selectedCategory, date: form.date });
       saving.current = false;
       closePanel();
     } catch (error) {
@@ -74,17 +87,18 @@ export default function AddTransactionPanel({ isOpen, onClose, onAdd, existingTr
 
   return <dialog ref={dialogRef} className="transaction-dialog" aria-labelledby="transaction-dialog-title" onCancel={event => { event.preventDefault(); closePanel(); }} onClick={event => { if (event.target === event.currentTarget) closePanel(); }}>
     <div className="dialog-content">
-      <div className="dialog-heading"><div><p className="eyebrow">ORGANIZE SEU DIA A DIA</p><h2 id="transaction-dialog-title">Nova transação</h2></div><button className="icon-button" aria-label="Fechar formulário" disabled={isSaving} onClick={closePanel}><Icon name="close" /></button></div>
-      <p className="offline-form-note">Salvamos primeiro neste dispositivo. O envio para sua conta acontece quando houver conexão.</p><form onSubmit={handleSubmit} noValidate aria-busy={isSaving}>
-        <fieldset className="type-fieldset" disabled={isSaving}><legend>Tipo de movimentação</legend><div className="type-options">{(['expense', 'income'] as const).map(type => <button type="button" key={type} aria-pressed={form.type === type} className={form.type === type ? 'type-option selected ' + type : 'type-option'} onClick={() => setForm(prev => ({ ...prev, type }))}><Icon name={type === 'income' ? 'down' : 'up'} size={18} />{type === 'income' ? 'Receita' : 'Despesa'}</button>)}</div></fieldset>
+      <div className="dialog-heading"><div><p className="eyebrow">ORGANIZE SEU DIA A DIA</p><h2 id="transaction-dialog-title">Nova transação</h2></div><button className="icon-button" aria-label="Fechar formulário" disabled={isBusy} onClick={closePanel}><Icon name="close" /></button></div>
+      <p className="offline-form-note">Salvamos primeiro neste dispositivo. O envio para sua conta acontece quando houver conexão.</p><form onSubmit={handleSubmit} noValidate aria-busy={isBusy}>
+        <fieldset className="type-fieldset" disabled={isBusy}><legend>Tipo de movimentação</legend><div className="type-options">{(['expense', 'income'] as const).map(type => <button type="button" key={type} aria-pressed={form.type === type} className={form.type === type ? 'type-option selected ' + type : 'type-option'} onClick={() => setForm(prev => ({ ...prev, type }))}><Icon name={type === 'income' ? 'down' : 'up'} size={18} />{type === 'income' ? 'Receita' : 'Despesa'}</button>)}</div></fieldset>
         <label className="form-label" htmlFor="transaction-amount">Valor da transação</label>
-        <div className="amount-field"><span>R$</span><input id="transaction-amount" type="number" inputMode="decimal" placeholder="0,00" min="0.01" step="0.01" required disabled={isSaving} value={form.amount} onChange={e => setForm(prev => ({ ...prev, amount: e.target.value }))} /></div>
+        <div className="amount-field"><span>R$</span><input id="transaction-amount" type="number" inputMode="decimal" placeholder="0,00" min="0.01" step="0.01" required disabled={isBusy} value={form.amount} onChange={e => setForm(prev => ({ ...prev, amount: e.target.value }))} /></div>
         <label className="form-label" htmlFor="transaction-title">Descrição</label>
-        <input className="form-input" id="transaction-title" placeholder="Ex.: Compras do mercado" required disabled={isSaving} value={form.title} onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))} />
-        <div className="form-grid"><div><label className="form-label" htmlFor="transaction-category">Categoria</label><select className="form-input" id="transaction-category" disabled={isSaving} value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value as Category }))}>{categories.map(category => <option key={category}>{category}</option>)}</select></div>
-          <div><label className="form-label" htmlFor="transaction-date">Data</label><input className="form-input" id="transaction-date" type="date" required disabled={isSaving} value={form.date} onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))} /></div></div>
+        <input className="form-input" id="transaction-title" placeholder="Ex.: Compras do mercado" required disabled={isBusy} value={form.title} onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))} />
+        <div className="form-grid"><CategoryPicker key={isOpen ? 'open' : 'closed'} categories={categories} value={selectedCategory} disabled={isBusy}
+          onChange={category => setForm(previous => ({ ...previous, category }))} onCreate={handleCreateCategory} />
+          <div><label className="form-label" htmlFor="transaction-date">Data</label><input className="form-input" id="transaction-date" type="date" required disabled={isBusy} value={form.date} onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))} /></div></div>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="dialog-actions"><button type="button" className="button secondary" disabled={isSaving} onClick={closePanel}>Cancelar</button><button type="submit" className="button primary" disabled={isSaving}><Icon name="plus" size={18} />{isSaving ? 'Salvando...' : 'Salvar transação'}</button></div>
+        <div className="dialog-actions"><button type="button" className="button secondary" disabled={isBusy} onClick={closePanel}>Cancelar</button><button type="submit" className="button primary" disabled={isBusy}><Icon name="plus" size={18} />{isSaving ? 'Salvando...' : 'Salvar transação'}</button></div>
       </form>
     </div>
   </dialog>;

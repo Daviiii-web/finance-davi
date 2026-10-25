@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Transaction, FinancialSummary } from '../types';
+import { DEFAULT_CATEGORIES } from '../categories';
 import {
-  readAccount, enqueueChange, visibleTransactions, subscribeAccount, OfflineStorageError,
+  readAccount, enqueueChange, visibleTransactions, subscribeAccount, OfflineStorageError, enqueueCategory, visibleCategories,
 } from '../lib/offlineTransactions';
 import type { OfflineAccount } from '../lib/offlineTransactions';
 import { importTransactions, getTransactionErrorMessage } from '../services/transactionService';
@@ -94,7 +95,6 @@ export function useTransactions(userId: string) {
     setIsMutating(true);
     setMutationError(null);
     try {
-      // The visible change and its queue entry derive from the same committed record.
       const saved = await enqueueChange(userId, kind, transaction);
       if (mounted.current) setAccount(current => !current || saved.revision >= current.revision ? saved : current);
     } finally {
@@ -106,6 +106,23 @@ export function useTransactions(userId: string) {
     }
   }
 
+  async function addCategory(name: string): Promise<string> {
+    if (busy.current) throw new Error('Aguarde a gravação atual terminar.');
+    if (!account || storageError) throw new Error('Não foi possível abrir suas categorias. Tente carregar novamente.');
+    busy.current = true;
+    setIsMutating(true);
+    try {
+      const saved = await enqueueCategory(userId, name);
+      if (mounted.current) setAccount(current => !current || saved.account.revision >= current.revision ? saved.account : current);
+      return saved.name;
+    } finally {
+      busy.current = false;
+      if (mounted.current) {
+        setIsMutating(false);
+        void refresh();
+      }
+    }
+  }
   async function addTransaction(data: Omit<Transaction, 'id'>) {
     await saveLocally('create', { ...data, id: crypto.randomUUID() });
   }
@@ -143,6 +160,7 @@ export function useTransactions(userId: string) {
     }
   }
 
+  const categories = useMemo(() => account ? visibleCategories(account) : [...DEFAULT_CATEGORIES], [account]);
   const transactions = useMemo(() => account ? visibleTransactions(account) : [], [account]);
   const pendingIds = useMemo(() => new Set(account?.pending.map(change => change.transaction.id)), [account]);
   const summary: FinancialSummary = useMemo(() => {
@@ -154,11 +172,11 @@ export function useTransactions(userId: string) {
   }, [transactions]);
 
   return {
-    transactions, summary, addTransaction, deleteTransaction, importLocalTransactions,
+    transactions, summary, addTransaction, deleteTransaction, importLocalTransactions, categories, addCategory,
     isLoading: account === null && storageError === null,
     isRefreshing, isMutating, isOffline, storageError, hasLocalAccount: account !== null,
     lastUpdated: account?.lastSyncedAt ? new Date(account.lastSyncedAt) : null,
-    pendingCount: account?.pending.length ?? 0, pendingIds,
+    pendingCount: (account?.pending.length ?? 0) + (account?.pendingCategories.length ?? 0), pendingIds,
     pendingDeletes: account?.pending.filter(change => change.kind === 'delete').length ?? 0,
     loadError, mutationError, refresh,
   };

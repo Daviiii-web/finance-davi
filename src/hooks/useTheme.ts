@@ -5,7 +5,6 @@ const STORAGE_KEY = 'poupae-theme';
 
 function readTheme(): Theme {
   try {
-    // Keep preferences saved before the app was renamed.
     const saved = localStorage.getItem(STORAGE_KEY)
       ?? localStorage.getItem('poupaê-theme')
       ?? localStorage.getItem('finance-davi-theme');
@@ -28,7 +27,6 @@ export function useTheme() {
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {
-      // The theme still works if the browser does not allow saving preferences.
     }
   }, [theme]);
 

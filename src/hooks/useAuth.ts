@@ -5,7 +5,7 @@ import { authRedirect, supabase } from '../lib/supabase';
 const RECOVERY_KEY = 'poupae:password-recovery';
 
 function clearRecovery() {
-  try { sessionStorage.removeItem(RECOVERY_KEY); } catch { /* Storage may be unavailable. */ }
+  try { sessionStorage.removeItem(RECOVERY_KEY); } catch {}
 }
 
 function rememberRecovery(session: Session) {
@@ -14,7 +14,7 @@ function rememberRecovery(session: Session) {
       userId: session.user.id,
       expiresAt: Date.now() + 15 * 60 * 1000,
     }));
-  } catch { /* Recovery still works until reload. */ }
+  } catch {}
 }
 
 function hasRecoveryMarker(session: Session): boolean {
@@ -47,7 +47,6 @@ export function useAuth() {
       if (!initialResolved) {
         initialResolved = true;
         if (authRedirect.recoveryRequested) {
-          // Never use an existing, unrelated session after a failed recovery callback.
           const validRecovery = !authRedirect.hasError && nextSession !== null &&
             (event === 'PASSWORD_RECOVERY' ||
               (authRedirect.accessToken !== null
@@ -72,14 +71,12 @@ export function useAuth() {
       }
     }
 
-    // Keep this callback synchronous; calling auth methods here can deadlock.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return;
       authChanged = true;
       applySession(event, nextSession);
     });
 
-    // Ignore stale initial responses after a newer authentication event.
     void supabase.auth.getSession().then(({ data, error: sessionError }) => {
       if (!active || authChanged) return;
       if (sessionError) {
